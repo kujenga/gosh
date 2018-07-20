@@ -6,7 +6,7 @@
 // appropriate for a prompt.
 //
 // There are likely some future optimizations that can be done, in particular
-// the two calls to git subshells can likely be optimized.
+// the git process exec can likely be removed with some small hacks.
 package main
 
 import (
@@ -45,17 +45,19 @@ func main() {
 }
 
 func getRaw() string {
+	wd, err := os.Getwd()
+	check(err, "getting current working directory")
+	// If we are able to get information on the git prefix,
 	gitPrefix, err := gitRevParse("--show-prefix")
 	if err == nil {
-		gitTopLevel, err := gitRevParse("--show-toplevel")
-		check(err, "checking top level git directory")
+		// mimics gitRevParse("--show-toplevel") without a subshell.
+		precedingPath := strings.TrimSuffix(wd, gitPrefix)
+		_, gitTopLevel := filepath.Split(precedingPath)
 		// return the path with the git repo as the root.
 		_, file := filepath.Split(gitTopLevel)
 		return filepath.Join(file, gitPrefix)
 	}
-	// fallback to the current working directory.
-	wd, err := os.Getwd()
-	check(err, "getting current working directory")
+	// fallback to just the current working directory.
 	return wd
 }
 
