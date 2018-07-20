@@ -48,6 +48,9 @@ func getDir() string {
 	// Walk up the directory tree looking for a .git directory, for which
 	// we would customize the printout.
 	dir := wd
+	// We terminate the loop when we are at the root, indicated by a
+	// following spash as documented:
+	// https://golang.org/pkg/path/filepath/#Dir
 	for !strings.HasSuffix(dir, pathSeparator) {
 		if _, err := os.Stat(filepath.Join(dir, ".git")); err == nil {
 			// If we find a directory with a .git directory, we
@@ -73,16 +76,21 @@ func smartenUp(s string) string {
 	s = strings.TrimSuffix(s, "/")
 	// Replace $HOME with ~ for brevity.
 	home := os.Getenv("HOME")
-	s = strings.Replace(s, home, "~", 1)
+	if strings.HasPrefix(s, home) {
+		s = strings.Replace(s, home, "~", 1)
+	}
 	// Shorten all path components but the last.
 	components := strings.Split(s, pathSeparator)
 	for i := range components {
 		if i == len(components)-1 {
 			break
 		}
-		components[i] = string([]rune(components[i])[0])
+		if components[i] != "" {
+			components[i] = string([]rune(components[i])[0])
+		}
 	}
-	return filepath.Join(components...)
+	// Use strings.Join here to preserve preceeding slash
+	return strings.Join(components, pathSeparator)
 }
 
 // check exits the program with the specified message if the error is non-nil.
