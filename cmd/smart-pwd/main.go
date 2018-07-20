@@ -4,16 +4,12 @@
 // intended user experience is that just enough information is provided to
 // indicate the current location, while maintaining a level of brevity
 // appropriate for a prompt.
-//
-// There are likely some future optimizations that can be done, in particular
-// the git process exec can likely be removed with some small hacks.
 package main
 
 import (
 	"fmt"
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 )
@@ -41,26 +37,37 @@ import (
 var pathSeparator = string([]rune{os.PathSeparator})
 
 func main() {
-	fmt.Println(smartenUp(getRaw()))
+	fmt.Println(smartenUp(getDir()))
 }
 
-func getRaw() string {
+// getDir gets the string representing the current directory in it's fully
+// qualified form with no abbreviations.
+func getDir() string {
 	wd, err := os.Getwd()
 	check(err, "getting current working directory")
-	// If we are able to get information on the git prefix,
-	gitPrefix, err := gitRevParse("--show-prefix")
-	if err == nil {
-		// mimics gitRevParse("--show-toplevel") without a subshell.
-		precedingPath := strings.TrimSuffix(wd, gitPrefix)
-		_, gitTopLevel := filepath.Split(precedingPath)
-		// return the path with the git repo as the root.
-		_, file := filepath.Split(gitTopLevel)
-		return filepath.Join(file, gitPrefix)
+	// Walk up the directory tree looking for a .git directory, for which
+	// we would customize the printout.
+	dir := wd
+	for !strings.HasSuffix(dir, pathSeparator) {
+		if _, err := os.Stat(filepath.Join(dir, ".git")); err == nil {
+			// If we find a directory with a .git directory, we
+			// return the relative path from it's containing
+			// directory.
+			gitParent := filepath.Dir(dir)
+			rel, err := filepath.Rel(gitParent, wd)
+			check(err, "getting relative path to working directory")
+			return rel
+		}
+		dir = filepath.Dir(dir)
 	}
-	// fallback to just the current working directory.
 	return wd
 }
 
+// smartenUp takes a path and shortens all the components to just their
+// first character, except for the last component. This is intended to present
+// enough information that viewing the string would give the reader an
+// indication where they are in their directory tree with minimal length,
+// aiming at use in shell prompts
 func smartenUp(s string) string {
 	// Strip trailing slashes from the path.
 	s = strings.TrimSuffix(s, "/")
@@ -76,18 +83,6 @@ func smartenUp(s string) string {
 		components[i] = string([]rune(components[i])[0])
 	}
 	return filepath.Join(components...)
-}
-
-// gitRevParse is a helper function for returning the output of `git rev-parse`
-// with various flags passed in.
-func gitRevParse(flag string) (string, error) {
-	out, err := exec.Command("git", "rev-parse", flag).CombinedOutput()
-	if err != nil {
-		return "", err
-	}
-	s := string(out)
-	s = strings.TrimSpace(s)
-	return s, nil
 }
 
 // check exits the program with the specified message if the error is non-nil.
