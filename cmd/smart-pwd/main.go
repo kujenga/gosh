@@ -37,7 +37,12 @@ import (
 var pathSeparator = string([]rune{os.PathSeparator})
 
 func main() {
-	fmt.Println(smartenUp(getDir()))
+	fmt.Println(getSmart())
+}
+
+func getSmart() string {
+	dir := getDir()
+	return smartenUp(dir)
 }
 
 // getDir gets the string representing the current directory in it's fully

@@ -10,11 +10,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestGetDir(t *testing.T) {
+func setup(t testing.TB) (string, func()) {
 	// mock home directory
 	home, err := ioutil.TempDir("", "TestGetDir-home")
 	require.NoError(t, err)
-	defer os.RemoveAll(home) // clean up
 	home, err = filepath.EvalSymlinks(home)
 	require.NoError(t, err)
 	// mock home directory
@@ -28,6 +27,42 @@ func TestGetDir(t *testing.T) {
 	} {
 		require.NoError(t, os.MkdirAll(filepath.Join(home, dir), 0777))
 	}
+	return home, func() { os.RemoveAll(home) }
+}
+
+var sink string
+
+func BenchmarkGetSmartPlain(b *testing.B) {
+	home, cleanup := setup(b)
+	defer cleanup()
+
+	var s string
+	b.ResetTimer()
+	for n := 0; n < b.N; n++ {
+		os.Chdir(filepath.Join(home, "aaa/bbb/ccc"))
+		s = getSmart()
+	}
+	b.StopTimer()
+	sink = s
+}
+
+func BenchmarkGetSmartGitRepo(b *testing.B) {
+	home, cleanup := setup(b)
+	defer cleanup()
+
+	var s string
+	b.ResetTimer()
+	for n := 0; n < b.N; n++ {
+		os.Chdir(filepath.Join(home, "xxx/yyy"))
+		s = getSmart()
+	}
+	b.StopTimer()
+	sink = s
+}
+
+func TestGetDir(t *testing.T) {
+	home, cleanup := setup(t)
+	defer cleanup()
 
 	tcs := []struct {
 		wd    string
